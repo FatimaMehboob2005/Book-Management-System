@@ -1,0 +1,299 @@
+include Irvine32.inc
+
+.data
+welcomeMsg          BYTE "~~WELCOME TO THE BOOK MANAGEMENT SYSTEM~~" , 0 
+menu                BYTE "~~~~~~~~MENU~~~~~~~~",0Dh, 0Ah
+                    BYTE "                          ",0DH, 0Ah
+                    BYTE "1. Add a Book          ", 0Dh, 0Ah
+                    BYTE "2. Delete a Book ", 0Dh, 0Ah
+                    BYTE "3. Search for a Book", 0Dh, 0Ah
+                    BYTE "4. Display All Books", 0Dh, 0Ah
+                    BYTE "5. Exit  ", 0Dh, 0Ah
+                    BYTE "                          ",0Dh, 0Ah
+                    BYTE "Enter your choice: ", 0
+requiredbookid      BYTE "Book ID: ", 0
+requiredbooktitle   BYTE "Book Title: ",0
+requiredbookauthor  BYTE "Book Author: ",0
+bookid              DWORD ?
+booktitle           BYTE 50 DUP(?)
+bookauthor          BYTE 50 DUP(?)
+successMsg          BYTE "The Process Was Executed Successfully",0
+booknotfound        BYTE "Not Found",0
+exiting             BYTE "Exiting The Program",0
+bookIds             DWORD 100 DUP(?)
+bookTitles          BYTE 100 * 50 DUP(?)
+bookAuthors         BYTE 100 * 50 DUP(?)
+bookCount           DWORD 0 ; Number of books
+promptInvalidChoice BYTE "Invalid Choice Re-enter Your choice",0
+bookfound           BYTE "Book exists in the inventory",0
+promptEmpty         BYTE "The inventory is empty",0
+
+.code
+main PROC
+    call Crlf
+    call Crlf
+    lea edx, welcomeMsg
+    call WriteString
+    call Crlf
+
+main_loop:
+    call Crlf
+    lea edx, menu
+    call WriteString
+
+    call ReadInt
+
+    cmp eax, 1
+    je addBook
+    cmp eax, 2
+    je deleteBook
+    cmp eax, 3
+    je searchBook
+    cmp eax, 4
+    je displayBooks
+    cmp eax, 5
+    je exitProgram
+
+    lea edx, promptInvalidChoice
+    call WriteString
+    call Crlf
+    jmp main_loop
+
+addBook:
+    call Crlf
+
+    mov edx, offset requiredbookid
+    call WriteString
+    call ReadInt
+    mov esi, bookCount
+    mov [bookIds + esi * 4], eax
+
+    mov edx, offset requiredbooktitle
+    call WriteString
+    mov edx, offset booktitle
+    mov ecx, SIZEOF booktitle
+    call ReadString
+
+    ; Copy title to bookTitles array
+    lea esi, booktitle
+    mov edi, offset bookTitles
+    mov eax, bookCount
+    imul eax, 50
+    add edi, eax
+    mov ecx, 50
+    rep movsb
+
+    mov edx, offset requiredbookauthor
+    call WriteString
+    mov edx, offset bookauthor
+    mov ecx, SIZEOF bookauthor
+    call ReadString
+
+    ; Copy author to bookAuthors array
+    lea esi, bookauthor
+    mov edi, offset bookAuthors
+    mov eax, bookCount
+    imul eax, 50
+    add edi, eax
+    mov ecx, 50
+    rep movsb
+
+    inc bookCount
+
+    call Crlf
+    lea edx, successMsg
+    call WriteString
+    call Crlf
+
+    jmp main_loop
+
+deleteBook:
+    call Crlf
+
+    ; Prompt for the book ID
+    mov edx, offset requiredbookid
+    call WriteString
+    call ReadInt
+    mov ebx, eax
+
+    ; Search for the book ID in the array
+    mov ecx, bookCount
+    mov esi, offset bookIds
+    mov eax, ecx
+    dec eax
+    mov edx, eax
+find_book_id:
+    cmp edx, -1
+    je delete_not_found
+
+    mov eax, [esi + edx * 4]
+    cmp eax, ebx
+    je delete_book_found
+    dec edx
+    jmp find_book_id
+
+delete_not_found:
+    call Crlf
+    lea edx, booknotfound
+    call WriteString
+    call Crlf
+    jmp main_loop
+
+delete_book_found:
+    ; Shift the arrays to remove the book
+    mov edi, edx
+    inc edi
+    mov ecx, bookCount
+    sub ecx, edi
+
+    ; Shift bookIds
+    lea esi, bookIds
+    imul edi, 4
+    add esi, edi
+    lea edi, bookIds
+    imul edx, 4
+    add edi, edx
+    mov ebx, ecx
+    rep movsd
+
+    ; Shift bookTitles
+    lea esi, bookTitles
+    mov eax, edx
+    imul eax, 50
+    add esi, eax
+    lea edi, bookTitles
+    mov eax, edx
+    imul eax, 50
+    add edi, eax
+    imul ecx, 50
+    mov ebx, ecx
+    rep movsb
+
+    ; Shift bookAuthors
+    lea esi, bookAuthors
+    mov eax, edx
+    imul eax, 50
+    add esi, eax
+    lea edi, bookAuthors
+    mov eax, edx
+    imul eax, 50
+    add edi, eax
+    imul ecx, 50
+    mov ebx, ecx
+    rep movsb
+
+    dec bookCount
+
+    call Crlf
+    lea edx, successMsg
+    call WriteString
+    call Crlf
+    jmp main_loop
+
+searchBook:
+    call Crlf
+
+    ; Prompt for the book ID
+    mov edx, offset requiredbookid
+    call WriteString
+    call ReadInt
+    mov ebx, eax  ; Store the entered book ID in ebx
+
+    ; Search for the book ID in the array
+    mov ecx, bookCount  ; Load the number of books
+    mov esi, offset bookIds  ; Point to the start of the book IDs array
+    xor edi, edi  ; Index for the book IDs array
+
+search_loop:
+    cmp edi, ecx  ; Compare index with the number of books
+    je search_not_found  ; If index equals bookCount, ID not found
+
+    mov eax, [esi + edi * 4]  ; Load the book ID at index edi
+    cmp eax, ebx  ; Compare the loaded ID with the entered ID
+    je search_book_found  ; If equal, book is found
+
+    inc edi  ; Increment the index
+    jmp search_loop  ; Repeat the loop
+
+search_not_found:
+    call Crlf
+    lea edx, booknotfound
+    call WriteString
+    call Crlf
+    jmp main_loop
+
+search_book_found:
+    call Crlf
+    lea edx, bookfound
+    call WriteString
+    call Crlf
+
+    ; Display book title
+    ;mov eax, edi
+    ;imul eax, 50
+    ;lea edx, bookTitles[eax]
+    ;call WriteString
+
+    ; Display book author
+    ;lea edx, bookAuthors[eax]
+    ;call WriteString
+    ;call Crlf
+
+    jmp main_loop
+
+
+displayBooks:
+    cmp bookCount, 0
+    je empty
+    mov ecx, bookCount
+    mov esi, 0
+
+display_loop:
+    cmp esi, ecx
+    jge main_loop
+
+    ; Display book ID
+    call crlf
+    mov eax, [bookIds + esi * 4]  ; Load the book ID into EAX
+    mov edx, 0
+    lea edx, requiredbookid
+    call writestring
+    call WriteDec  ; Display the book ID
+    call Crlf
+
+    ; Display book title
+    mov eax, esi
+    imul eax, 50
+    lea edx, requiredbooktitle
+    call writestring
+    lea edx, bookTitles[eax]
+    call WriteString
+    call Crlf
+
+    ; Display book author
+    lea edx, requiredbookauthor
+    call writestring
+    lea edx, bookAuthors[eax]
+    call WriteString
+    call Crlf
+
+    inc esi
+    jmp display_loop
+
+empty:
+    lea edx, promptEmpty
+    call writestring 
+    call crlf
+
+    jmp main_loop
+
+exitProgram:
+    call Crlf
+    lea edx, exiting
+    call WriteString
+    call Crlf
+
+    exit
+
+main ENDP
+END main
